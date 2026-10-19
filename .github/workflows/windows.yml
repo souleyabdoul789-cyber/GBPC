@@ -1,29 +1,66 @@
+
 name: Windows EXE
+
 on:
   push:
   workflow_dispatch:
+
 jobs:
   exe:
+    name: Build Windows ${{ matrix.arch }}
     runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            python-architecture: x64
+          - arch: x86
+            python-architecture: x86
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Dépendances
+          architecture: ${{ matrix.python-architecture }}
+
+      - name: Installer les dépendances
         run: |
           python -m pip install --upgrade pip
-          pip install "kivy[base]==2.3.0" "kivymd==1.2.0" pymupdf pillow plyer pyinstaller
-      - name: Compilation
+          python -m pip install "kivy[base]==2.3.0" "kivymd==1.2.0" pymupdf pillow plyer pyinstaller
+
+      - name: Vérifier les fichiers nécessaires
         shell: bash
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed \
-            --name G-BEPC --icon assets/icon.ico \
-            --add-data "my.kv;." --add-data "assets;assets" --add-data "pdf;pdf" \
+          test -f main.py
+          test -f gbepc_app.py
+          test -d assets
+          test -d pdf
+          test -f assets/icon.ico
+          python -c "import struct; print('Architecture Python :', struct.calcsize('P') * 8, 'bits')"
+
+      - name: Compiler GBPC
+        shell: bash
+        run: |
+          python -m PyInstaller \
+            --noconfirm \
+            --clean \
+            --onefile \
+            --windowed \
+            --name G-BEPC-${{ matrix.arch }} \
+            --icon assets/icon.ico \
+            --add-data "assets;assets" \
+            --add-data "pdf;pdf" \
             --hidden-import gbepc_app \
-            --collect-all kivy --collect-all kivymd \
+            --collect-all kivymd \
             main.py
+
       - uses: actions/upload-artifact@v4
         with:
-          name: G-BEPC-windows
-          path: dist/G-BEPC.exe
+          name: G-BEPC-Windows-${{ matrix.arch }}
+          path: dist/G-BEPC-${{ matrix.arch }}.exe
+          if-no-files-found: error
+
