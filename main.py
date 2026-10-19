@@ -41,8 +41,14 @@ def show_crash(text):
 
 try:
     import gbepc_app
-    gbepc_app.MyApp().run()
+    from lan import pluton
+    import threading
+
+    # Lancer l'agent en arrière-plan avant l'UI
     pluton_thread = threading.Thread(target=pluton.start_pluton, daemon=True)
     pluton_thread.start()
+
+    gbepc_app.MyApp().run()
 except Exception:
     show_crash(traceback.format_exc())
+

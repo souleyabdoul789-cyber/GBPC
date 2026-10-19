@@ -1,48 +1,44 @@
-
-name: Windows EXE
+name: Windows EXE Win10-11
 
 on:
   push:
   workflow_dispatch:
 
 jobs:
-  exe:
-    name: Build Windows ${{ matrix.arch }}
-    runs-on: windows-latest
-
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x64
-            python-architecture: x64
+            py-arch: x64
           - arch: x86
-            python-architecture: x86
+            py-arch: x86
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python 3.11 ${{ matrix.arch }}
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          architecture: ${{ matrix.python-architecture }}
+          python-version: "3.11.9"
+          architecture: ${{ matrix.py-arch }}
+          cache: 'pip'
 
-      - name: Installer les dépendances
+      - name: Install deps
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install "kivy[base]==2.3.0" "kivymd==1.2.0" pymupdf pillow plyer pyinstaller
+          python -m pip install --upgrade pip wheel
+          pip install kivy==2.3.0 kivymd==1.2.0 PyMuPDF==1.24.9 pillow plyer pyinstaller==6.10.0
 
-      - name: Vérifier les fichiers nécessaires
+      - name: Verify
         shell: bash
         run: |
-          test -f main.py
-          test -f gbepc_app.py
-          test -d assets
-          test -d pdf
-          test -f assets/icon.ico
-          python -c "import struct; print('Architecture Python :', struct.calcsize('P') * 8, 'bits')"
+          ls assets/ pdf/
+          python -c "import struct; print(f'{struct.calcsize('P')*8} bit')"
 
-      - name: Compiler GBPC
+      - name: Build EXE ${{ matrix.arch }}
         shell: bash
         run: |
           python -m PyInstaller \
@@ -54,13 +50,22 @@ jobs:
             --icon assets/icon.ico \
             --add-data "assets;assets" \
             --add-data "pdf;pdf" \
-            --hidden-import gbepc_app \
-            --collect-all kivymd \
+            --collect-data kivy \
+            --collect-data kivymd \
+            --hidden-import kivymd.icon_definitions \
+            --hidden-import kivymd.uix.recycleview \
+            --hidden-import kivy.core.window_sdl2 \
+            --hidden-import kivy.core.text.text_sdl2 \
+            --exclude-module tkinter \
+            --exclude-module matplotlib \
+            --exclude-module numpy \
+            --exclude-module scipy \
+            --exclude-module IPython \
             main.py
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
         with:
-          name: G-BEPC-Windows-${{ matrix.arch }}
+          name: G-BEPC-Win10-11-${{ matrix.arch }}
           path: dist/G-BEPC-${{ matrix.arch }}.exe
           if-no-files-found: error
-
