@@ -2,6 +2,7 @@ name: Windows EXE Win10-11
 
 on:
   push:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -18,25 +19,28 @@ jobs:
             py-arch: x86
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Python 3.11 ${{ matrix.arch }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.11.9"
           architecture: ${{ matrix.py-arch }}
-          cache: 'pip'
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip wheel
-          pip install kivy==2.3.0 kivymd==1.2.0 PyMuPDF==1.24.9 pillow plyer pyinstaller==6.10.0
+          python -m pip install kivy==2.3.0 kivymd==1.2.0 PyMuPDF==1.24.9 pillow plyer pyinstaller==6.10.0
 
-      - name: Verify
+      - name: Check files
         shell: bash
         run: |
-          ls assets/ pdf/
-          python -c "import struct; print(f'{struct.calcsize('P')*8} bit')"
+          echo "=== Structure ==="
+          ls -R
+          echo "=== Python ==="
+          python --version
+          python -c "import struct; print(f'Architecture: {struct.calcsize('P')*8} bit')"
 
       - name: Build EXE ${{ matrix.arch }}
         shell: bash
@@ -63,9 +67,16 @@ jobs:
             --exclude-module IPython \
             main.py
 
-      - name: Upload EXE
+      - name: Check build result
+        shell: bash
+        run: |
+          ls -lh dist/
+          echo "Build ${{ matrix.arch }} OK"
+
+      - name: Upload artifact ${{ matrix.arch }}
         uses: actions/upload-artifact@v4
         with:
           name: G-BEPC-Win10-11-${{ matrix.arch }}
           path: dist/G-BEPC-${{ matrix.arch }}.exe
           if-no-files-found: error
+          retention-days: 7
