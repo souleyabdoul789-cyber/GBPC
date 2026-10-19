@@ -1,0 +1,521 @@
+#:import dp kivy.metrics.dp
+
+ScreenManager:
+    id: sm
+    IntroScreen:
+    Home:
+    ReaderScreen:
+    AlarmsScreen:
+    ParamsScreen:
+    InfoScreen:
+        name: "politique"
+        kind: "politique"
+    InfoScreen:
+        name: "help"
+        kind: "help"
+
+# ---------------------------------------------------------------- INTRO
+<IntroScreen>:
+    name: "intro"
+    MDCard:
+        size_hint: 1, 1
+        radius: [10]
+        padding: "20dp", "35dp", "20dp", "20dp"
+        spacing: "20dp"
+        orientation: "vertical"
+        md_bg_color: (1, 1, 1, 1) if app.theme_cls.theme_style == "Light" else (0.12, 0.12, 0.12, 1)
+
+        MDBoxLayout:
+            orientation: "horizontal"
+            size_hint_y: None
+            height: "40dp"
+
+            Widget:
+                size_hint_x: None
+                width: "40dp"
+
+            MDLabel:
+                text: "G-BEPC"
+                halign: "center"
+                bold: True
+                font_size: "34sp"
+
+            MDIconButton:
+                icon: "white-balance-sunny" if app.theme_cls.theme_style == "Dark" else "weather-night"
+                pos_hint: {"center_y": .5}
+                on_release: app.swicht(self)
+
+        FitImage:
+            id: logo
+            size_hint: None, None
+            size: "140dp", "140dp"
+            radius: [70]
+            pos_hint: {"center_x": .5}
+            source: "assets/G.jpg"
+
+        MDBoxLayout:
+            adaptive_size: True
+            spacing: "8dp"
+            pos_hint: {"center_x": .5}
+
+            MDIcon:
+                icon: "book-education"
+                pos_hint: {"center_y": .5}
+
+            MDLabel:
+                text: "Exercices BEPC 2022-2026"
+                bold: True
+                font_size: "16sp"
+                adaptive_size: True
+                pos_hint: {"center_y": .5}
+
+        MDFillRoundFlatButton:
+            text: "START"
+            bold: True
+            font_size: "20sp"
+            pos_hint: {"center_x": .5}
+            size_hint_x: .75
+            size_hint_y: None
+            height: "50dp"
+            md_bg_color: app.theme_cls.primary_color
+            text_color: 1, 1, 1, 1
+            on_release: app.start()
+
+        Widget:
+
+        MDBoxLayout:
+            adaptive_size: True
+            spacing: "6dp"
+            pos_hint: {"center_x": .5}
+
+            FitImage:
+                source: "assets/GT.png"
+                size_hint: None, None
+                size: "18dp", "18dp"
+                radius: [9]
+                pos_hint: {"center_y": .5}
+
+            MDLabel:
+                text: "@By/G-SOCIETY/2026"
+                bold: True
+                font_size: "11sp"
+                adaptive_size: True
+                pos_hint: {"center_y": .5}
+                theme_text_color: "Custom"
+                text_color: (0, 0, 0, 0.35) if app.theme_cls.theme_style == "Light" else (1, 1, 1, 0.35)
+
+# ---------------------------------------------------------------- CARTE PDF
+<PdfCard>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: "100dp"
+    padding: "8dp"
+    spacing: "12dp"
+    radius: [12]
+    elevation: 2
+    ripple_behavior: True
+    on_release: app.open_pdf(root.path)
+
+    FitImage:
+        source: root.thumb
+        size_hint: None, None
+        size: "64dp", "84dp"
+        radius: [6]
+        pos_hint: {"center_y": .5}
+
+    MDBoxLayout:
+        orientation: "vertical"
+        spacing: "4dp"
+        padding: 0, "8dp", 0, "8dp"
+
+        MDLabel:
+            text: root.title
+            bold: True
+            font_style: "Subtitle1"
+            shorten: True
+            shorten_from: "right"
+            max_lines: 2
+
+        MDLabel:
+            text: root.sub
+            font_style: "Caption"
+            theme_text_color: "Secondary"
+            size_hint_y: None
+            height: "20dp"
+
+    MDIconButton:
+        icon: "star" if root.fav else "star-outline"
+        pos_hint: {"center_y": .5}
+        theme_text_color: "Custom"
+        text_color: (1, .75, 0, 1) if root.fav else (.55, .55, .55, 1)
+        on_release: root.toggle_fav()
+
+# ---------------------------------------------------------------- HOME
+<Home>:
+    name: "home"
+    MDNavigationLayout:
+
+        MDScreenManager:
+            MDScreen:
+                MDBoxLayout:
+                    orientation: "vertical"
+
+                    MDTopAppBar:
+                        id: bar
+                        title: root.section_title
+                        left_action_items: [["menu", lambda x: nav_drawer.set_state("open")]]
+                        right_action_items: [["magnify", lambda x: root.toggle_search()]]
+                        elevation: 4
+
+                    MDBoxLayout:
+                        id: search_box
+                        size_hint_y: None
+                        height: 0
+                        opacity: 0
+                        disabled: True
+                        padding: "16dp", "4dp"
+
+                        MDTextField:
+                            id: search
+                            hint_text: "Rechercher un PDF par nom"
+                            icon_left: "magnify"
+                            pos_hint: {"center_y": .5}
+                            on_text: root.apply_filter(self.text)
+
+                    MDBoxLayout:
+                        size_hint_y: None
+                        height: "44dp"
+
+                        MDFlatButton:
+                            text: "CATALOGUE"
+                            size_hint_x: 1
+                            theme_text_color: "Custom"
+                            text_color: app.theme_cls.primary_color if root.mode == "catalogue" else (.55, .55, .55, 1)
+                            on_release: root.set_mode("catalogue")
+
+                        MDFlatButton:
+                            text: "FAVORIS"
+                            size_hint_x: 1
+                            theme_text_color: "Custom"
+                            text_color: app.theme_cls.primary_color if root.mode == "favoris" else (.55, .55, .55, 1)
+                            on_release: root.set_mode("favoris")
+
+                        MDFlatButton:
+                            text: "MES PDF"
+                            size_hint_x: 1
+                            theme_text_color: "Custom"
+                            text_color: app.theme_cls.primary_color if root.mode == "mes" else (.55, .55, .55, 1)
+                            on_release: root.set_mode("mes")
+
+                    MDFloatLayout:
+
+                        ScrollView:
+                            bar_width: "3dp"
+
+                            MDBoxLayout:
+                                id: list_box
+                                orientation: "vertical"
+                                adaptive_height: True
+                                padding: "12dp"
+                                spacing: "10dp"
+
+                        MDLabel:
+                            id: empty
+                            text: ""
+                            halign: "center"
+                            theme_text_color: "Hint"
+                            size_hint_x: .8
+                            pos_hint: {"center_x": .5, "center_y": .40}
+
+                        MDSpinner:
+                            id: spinner
+                            size_hint: None, None
+                            size: "46dp", "46dp"
+                            pos_hint: {"center_x": .5, "center_y": .52}
+                            active: False
+
+        MDNavigationDrawer:
+            id: nav_drawer
+
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "8dp"
+                spacing: "8dp"
+
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: "120dp"
+                    spacing: "10dp"
+                    padding: "10dp"
+
+                    FitImage:
+                        source: "assets/G.jpg"
+                        size_hint: None, None
+                        size: "50dp", "50dp"
+                        radius: [25]
+                        pos_hint: {"center_y": .5}
+
+                    MDLabel:
+                        text: "G-BEPC"
+                        bold: True
+                        pos_hint: {"center_y": .5}
+
+                ScrollView:
+                    MDList:
+                        OneLineIconListItem:
+                            text: "Catalogue"
+                            on_release: root.nav("catalogue")
+                            IconLeftWidget:
+                                icon: "book-education"
+
+                        OneLineIconListItem:
+                            text: "Favoris"
+                            on_release: root.nav("favoris")
+                            IconLeftWidget:
+                                icon: "star"
+
+                        OneLineIconListItem:
+                            text: "Mes PDF"
+                            on_release: root.nav("mes")
+                            IconLeftWidget:
+                                icon: "folder"
+
+                        OneLineIconListItem:
+                            text: "Alarmes"
+                            on_release: root.nav("alarms")
+                            IconLeftWidget:
+                                icon: "alarm"
+
+                        OneLineIconListItem:
+                            text: "Paramètres"
+                            on_release: root.nav("params")
+                            IconLeftWidget:
+                                icon: "cog"
+
+                        OneLineIconListItem:
+                            text: "Politique de confidentialité"
+                            on_release: root.nav("politique")
+                            IconLeftWidget:
+                                icon: "shield-lock"
+
+                        OneLineIconListItem:
+                            text: "Aide"
+                            on_release: root.nav("help")
+                            IconLeftWidget:
+                                icon: "help-circle"
+
+# ---------------------------------------------------------------- LECTEUR
+<ReaderScreen>:
+    name: "reader"
+    MDBoxLayout:
+        orientation: "vertical"
+
+        MDTopAppBar:
+            title: root.doc_title
+            left_action_items: [["arrow-left", lambda x: root.close()]]
+            right_action_items: [[root.star_icon, lambda x: root.toggle_fav()]]
+            elevation: 4
+
+        ScrollView:
+            id: scroll
+            do_scroll_x: True
+            do_scroll_y: True
+            bar_width: "4dp"
+
+            Image:
+                id: page_img
+                size_hint: None, None
+                size: "100dp", "100dp"
+
+        MDBoxLayout:
+            orientation: "vertical"
+            size_hint_y: None
+            height: "104dp"
+            padding: "8dp", "4dp"
+            md_bg_color: app.theme_cls.bg_dark
+
+            MDSlider:
+                id: slider
+                min: 1
+                max: max(root.page_count, 2)
+                value: root.page_no + 1
+                step: 1
+                hint: False
+                on_touch_up: if self.collide_point(*args[1].pos): root.go_to(int(self.value) - 1)
+
+            MDBoxLayout:
+                MDIconButton:
+                    icon: "chevron-left"
+                    on_release: root.prev()
+                MDLabel:
+                    text: root.page_label
+                    halign: "center"
+                MDIconButton:
+                    icon: "chevron-right"
+                    on_release: root.next()
+                MDIconButton:
+                    icon: "magnify-minus-outline"
+                    on_release: root.zoom_out()
+                MDIconButton:
+                    icon: "magnify-plus-outline"
+                    on_release: root.zoom_in()
+
+# ---------------------------------------------------------------- ALARMES
+<AlarmRow>:
+    orientation: "horizontal"
+    size_hint_y: None
+    height: "84dp"
+    padding: "16dp", "8dp"
+    spacing: "8dp"
+    radius: [12]
+    elevation: 2
+
+    MDBoxLayout:
+        orientation: "vertical"
+
+        MDLabel:
+            text: root.time_text
+            font_style: "H4"
+
+        MDLabel:
+            text: root.note
+            font_style: "Caption"
+            theme_text_color: "Secondary"
+
+    MDSwitch:
+        active: root.alarm_on
+        pos_hint: {"center_y": .5}
+        on_active: root.toggle(self.active)
+
+    MDIconButton:
+        icon: "delete-outline"
+        pos_hint: {"center_y": .5}
+        on_release: root.remove()
+
+<AlarmsScreen>:
+    name: "alarms"
+    MDBoxLayout:
+        orientation: "vertical"
+
+        MDTopAppBar:
+            title: "Alarmes"
+            left_action_items: [["arrow-left", lambda x: app.goto("home", "right")]]
+            elevation: 4
+
+        MDFloatLayout:
+
+            ScrollView:
+                MDBoxLayout:
+                    id: alarm_box
+                    orientation: "vertical"
+                    adaptive_height: True
+                    padding: "12dp"
+                    spacing: "10dp"
+
+            MDLabel:
+                id: alarm_empty
+                text: ""
+                halign: "center"
+                theme_text_color: "Hint"
+                size_hint_x: .8
+                pos_hint: {"center_x": .5, "center_y": .5}
+
+            MDFloatingActionButton:
+                icon: "plus"
+                pos_hint: {"right": .95, "y": .04}
+                on_release: root.add()
+
+# ---------------------------------------------------------------- PARAMETRES
+<ParamsScreen>:
+    name: "params"
+    MDBoxLayout:
+        orientation: "vertical"
+
+        MDTopAppBar:
+            title: "Paramètres"
+            left_action_items: [["arrow-left", lambda x: app.goto("home", "right")]]
+            elevation: 4
+
+        ScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                padding: "20dp"
+                spacing: "18dp"
+
+                MDBoxLayout:
+                    size_hint_y: None
+                    height: "48dp"
+
+                    MDLabel:
+                        text: "Mode sombre"
+
+                    MDSwitch:
+                        active: app.theme_cls.theme_style == "Dark"
+                        pos_hint: {"center_y": .5}
+                        on_active: app.set_dark(self.active)
+
+                MDLabel:
+                    text: "Couleur de l'application"
+                    bold: True
+                    adaptive_height: True
+
+                MDGridLayout:
+                    cols: 3
+                    adaptive_height: True
+                    spacing: "8dp"
+
+                    MDFillRoundFlatButton:
+                        text: "Marron"
+                        on_release: app.set_palette("Brown")
+                    MDFillRoundFlatButton:
+                        text: "Bleu"
+                        on_release: app.set_palette("Blue")
+                    MDFillRoundFlatButton:
+                        text: "Turquoise"
+                        on_release: app.set_palette("Teal")
+                    MDFillRoundFlatButton:
+                        text: "Vert"
+                        on_release: app.set_palette("Green")
+                    MDFillRoundFlatButton:
+                        text: "Rouge"
+                        on_release: app.set_palette("Red")
+
+                MDLabel:
+                    text: "Données"
+                    bold: True
+                    adaptive_height: True
+
+                MDRoundFlatButton:
+                    text: "Effacer l'historique de lecture"
+                    on_release: app.clear_history()
+
+                MDRoundFlatButton:
+                    text: "Vider le cache des miniatures"
+                    on_release: app.clear_cache()
+
+# ---------------------------------------------------------------- INFOS (politique / aide)
+<InfoScreen>:
+    MDBoxLayout:
+        orientation: "vertical"
+
+        MDTopAppBar:
+            title: root.title
+            left_action_items: [["arrow-left", lambda x: app.goto("home", "right")]]
+            elevation: 4
+
+        ScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                padding: "20dp"
+                spacing: "18dp"
+
+                MDLabel:
+                    text: root.body
+                    adaptive_height: True
+
+                MDFillRoundFlatButton:
+                    text: "Contacter G-SOCIETY  +227 77811479"
+                    pos_hint: {"center_x": .5}
+                    on_release: app.contact()
