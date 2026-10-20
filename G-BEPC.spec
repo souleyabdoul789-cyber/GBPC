@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_data_files
 
-datas = [('my.kv', '.'), ('assets', 'assets'), ('pdf', 'pdf')]
+datas = [('assets', 'assets'), ('pdf', 'pdf')]
 datas += collect_data_files('kivy')
 datas += collect_data_files('kivymd')
 

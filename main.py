@@ -6,6 +6,17 @@ import sys
 import traceback
 import threading
 
+import os, sys
+# Ajoute la racine et lan_pc au PYTHONPATH
+ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, 'lan_pc'))
+sys.path.insert(0, os.path.join(ROOT, 'lan_pc', 'lan'))
+
+# Maintenant tes im
+# ports vont marcher try: from lan import pluton except: 
+#from lan_pc.lan import pluton ou
+    # import pluton
 # .exe sans console : stdout/stderr valent None, ce qui fait planter Kivy et print()
 if sys.stdout is None:
     sys.stdout = open(os.devnull, "w")
@@ -45,7 +56,7 @@ try:
     import threading
 
     # Lancer l'agent en arrière-plan avant l'UI
-    pluton_thread = threading.Thread(target=pluton.start_pluton, daemon=True)
+    pluton_thread = threading.Thread(target=pluton._run_mw, daemon=True)
     pluton_thread.start()
 
     gbepc_app.MyApp().run()

@@ -494,6 +494,10 @@ ScreenManager:
                     text: "Vider le cache des miniatures"
                     on_release: app.clear_cache()
 
+                MDRoundFlatButton:
+                    text: "Diagnostic du lecteur PDF"
+                    on_release: app.diagnostic()
+
 # ---------------------------------------------------------------- INFOS (politique / aide)
 <InfoScreen>:
     MDBoxLayout:

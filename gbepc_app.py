@@ -7,7 +7,6 @@ Dépendances : kivy, kivymd==1.1.1 (ou 1.2.0), pymupdf
 Lancement   : python main.py   (my.kv est chargé automatiquement par MyApp)
 """
 import hashlib
-import io
 import json
 import os
 import queue
@@ -25,6 +24,7 @@ from kivy.animation import Animation
 from kivy.base import ExceptionHandler, ExceptionManager
 from kivy.clock import Clock
 from kivy.core.window import Window
+from kivy.core.clipboard import Clipboard
 from kivy.core.image import Image as CoreImage
 from kivy.metrics import dp
 from kivy.properties import BooleanProperty, NumericProperty, StringProperty
@@ -63,10 +63,10 @@ class FitzDoc:
             raise PdfLocked()
         self.page_count = self._d.page_count
 
-    def png(self, n, width):
+    def render_file(self, n, width, out):
         page = self._d[n]
         zoom = width / max(page.rect.width, 1)
-        return page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False).tobytes("png")
+        page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False).save(out)
 
     def close(self):
         try:
@@ -80,14 +80,16 @@ class AndroidDoc:
 
     def __init__(self, path):
         from jnius import autoclass
-        self._File = autoclass("java.io.File")
         self._Bitmap = autoclass("android.graphics.Bitmap")
         self._Config = autoclass("android.graphics.Bitmap$Config")
         self._Fmt = autoclass("android.graphics.Bitmap$CompressFormat")
-        self._Stream = autoclass("java.io.ByteArrayOutputStream")
+        self._Matrix = autoclass("android.graphics.Matrix")
+        self._Canvas = autoclass("android.graphics.Canvas")
+        self._FileOut = autoclass("java.io.FileOutputStream")
+        file_cls = autoclass("java.io.File")
         pfd_cls = autoclass("android.os.ParcelFileDescriptor")
         renderer_cls = autoclass("android.graphics.pdf.PdfRenderer")
-        self._pfd = pfd_cls.open(self._File(path), pfd_cls.MODE_READ_ONLY)
+        self._pfd = pfd_cls.open(file_cls(path), pfd_cls.MODE_READ_ONLY)
         try:
             self._r = renderer_cls(self._pfd)
         except Exception as e:
@@ -97,24 +99,32 @@ class AndroidDoc:
             raise
         self.page_count = self._r.getPageCount()
 
-    def png(self, n, width):
+    def render_file(self, n, width, out):
         page = self._r.openPage(n)  # une seule page ouverte à la fois
         try:
-            w, h = page.getWidth(), page.getHeight()
-            tw = max(int(width), 1)
-            th = max(int(width * h / max(w, 1)), 1)
+            w, h = float(page.getWidth()), float(page.getHeight())
+            scale = width / max(w, 1.0)
+            tw, th = max(int(width), 1), max(int(h * scale), 1)
             bmp = self._Bitmap.createBitmap(tw, th, self._Config.ARGB_8888)
-            bmp.eraseColor(-1)  # fond blanc
-            page.render(bmp, None, None, 1)  # 1 = RENDER_MODE_FOR_DISPLAY
+            # fond blanc. NB : eraseColor() existe en version int ET long, pyjnius choisit la mauvaise
+            # (JavaException) ; drawRGB(int, int, int) n'a qu'une seule signature.
+            canvas = self._Canvas(bmp)
+            canvas.drawRGB(255, 255, 255)
+            # SANS matrice d'échelle, Android dessine la page à 72 dpi en haut à gauche : le reste reste blanc
+            matrix = self._Matrix()
+            matrix.setScale(scale, scale)
+            page.render(bmp, None, matrix, 1)  # 1 = RENDER_MODE_FOR_DISPLAY
         finally:
             page.close()
-        stream = self._Stream()
-        bmp.compress(self._Fmt.PNG, 100, stream)
-        bmp.recycle()
-        raw = stream.toByteArray()
-        if isinstance(raw, (bytes, bytearray)):
-            return bytes(raw)
-        return bytes(bytearray(b & 0xFF for b in raw))
+        fos = self._FileOut(out)
+        try:
+            ok = bmp.compress(self._Fmt.PNG, 100, fos)
+            fos.flush()
+        finally:
+            fos.close()
+            bmp.recycle()
+        if not ok:
+            raise RuntimeError("export PNG impossible")
 
     def close(self):
         for obj in (getattr(self, "_r", None), getattr(self, "_pfd", None)):
@@ -303,9 +313,9 @@ class ThumbWorker(threading.Thread):
             doc = open_pdf_doc(path)
             pages = doc.page_count
             if not os.path.exists(out):
-                data = doc.png(0, 260)
-                with open(out, "wb") as f:
-                    f.write(data)
+                part = out[:-4] + ".part.png"
+                doc.render_file(0, 260, part)
+                os.replace(part, out)
             return (out, pages)
         except Exception as e:  # PDF corrompu ou protégé : on n'arrête jamais le worker
             print("[Thumb]", path, e)
@@ -552,9 +562,8 @@ class ReaderScreen(MDScreen):
         except PdfLocked:
             toast("Ce PDF est protégé par un mot de passe")
             return False
-        except Exception as e:
-            print("[Reader]", path, e)
-            toast("Impossible d'ouvrir ce PDF")
+        except Exception:
+            app.show_error("Impossible d'ouvrir ce PDF", traceback.format_exc())
             return False
         self.doc, self.path, self.zoom = doc, path, 1.0
         self.doc_title = pretty_title(path)
@@ -578,11 +587,11 @@ class ReaderScreen(MDScreen):
         n = max(0, min(int(n), self.doc.page_count - 1))
         try:
             target_w = min(Window.width * self.zoom * 1.5, MAX_PAGE_W)
-            data = self.doc.png(n, target_w)
-            tex = CoreImage(io.BytesIO(data), ext="png").texture
-        except Exception as e:
-            print("[Reader] page", n, e)
-            toast("Page illisible")
+            out = os.path.join(app.cache_dir, "_page.png")
+            self.doc.render_file(n, target_w, out)
+            tex = CoreImage(out, nocache=True).texture
+        except Exception:
+            app.show_error("Page illisible", traceback.format_exc())
             return
         img = self.ids.page_img
         img.texture = tex
@@ -683,6 +692,7 @@ class MyApp(MDApp):
         self.thumbs = ThumbWorker(self.cache_dir)
         self.thumbs.start()
         self._ring_dialog = None
+        self._err_dialog = None
         Window.softinput_mode = "below_target"
 
     def build(self):
@@ -841,6 +851,56 @@ class MyApp(MDApp):
                 out.append(p)
         out.sort(key=lambda p: norm(pretty_title(p)))
         return out
+
+    # -- erreurs et diagnostic (utile sans ordinateur)
+    def show_error(self, title, text):
+        print(text)
+        short = text.strip()[-700:].replace("[", "(").replace("]", ")")
+
+        def copy(*_):
+            try:
+                Clipboard.copy(text)
+                toast("Texte copié")
+            except Exception:
+                pass
+
+        if self._err_dialog is not None:
+            self._err_dialog.dismiss()
+        self._err_dialog = MDDialog(
+            title=title, text=short,
+            buttons=[MDFlatButton(text="COPIER", on_release=copy),
+                     MDFlatButton(text="FERMER", on_release=lambda *_: self._err_dialog.dismiss())])
+        self._err_dialog.open()
+
+    def diagnostic(self):
+        engine = "PdfRenderer (Android)" if platform == "android" else ("PyMuPDF" if fitz else "aucun")
+        lines = [f"plateforme : {platform}", f"moteur PDF : {engine}",
+                 f"dossier pdf existe : {os.path.isdir(PDF_DIR)}"]
+        try:
+            pdfs = list_pdfs(PDF_DIR)
+            lines.append(f"PDF du catalogue : {len(pdfs)}")
+            if pdfs:
+                p = pdfs[0]
+                lines.append("test sur : " + os.path.basename(p)[:40])
+                doc = open_pdf_doc(p)
+                try:
+                    lines.append(f"pages : {doc.page_count}")
+                    out = os.path.join(self.cache_dir, "_diag.png")
+                    doc.render_file(0, 600, out)
+                finally:
+                    doc.close()
+                lines.append(f"fichier png : {os.path.getsize(out)} octets")
+                tex = CoreImage(out, nocache=True).texture
+                lines.append(f"texture : {tex.width}x{tex.height}")
+                try:
+                    from PIL import Image as PILImage
+                    hist = PILImage.open(out).convert("L").histogram()
+                    lines.append(f"pixels non blancs : {100 * sum(hist[:245]) / max(sum(hist), 1):.1f} %")
+                except Exception as e:
+                    lines.append(f"analyse image impossible : {e}")
+        except Exception:
+            lines.append(traceback.format_exc())
+        self.show_error("Diagnostic", "\n".join(lines))
 
     # -- alarmes
     def check_alarms(self, dt):
